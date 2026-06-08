@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arc File Sharing</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.15.0/ethers.umd.min.js"></script>
+
+    <style>
+        :root{
+            --bg:#0b0f19;
+            --card:#151f32;
+            --border:#24334c;
+            --primary:#2563eb;
+            --success:#16a34a;
+            --error:#dc2626;
+            --text:#f3f4f6;
+            --muted:#9ca3af;
+        }
+
+        *{
+            margin:0;
+            padding:0;
+            box-sizing:border-box;
+        }
+
+        body{
+            background:var(--bg);
+            color:var(--text);
+            font-family:system-ui,sans-serif;
+            min-height:100vh;
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            padding:20px;
+        }
+
+        .wrapper{
+            width:100%;
+            max-width:650px;
+            background:var(--card);
+            border:1px solid var(--border);
+            border-radius:16px;
+            padding:25px;
+            box-shadow:0 20px 40px rgba(0,0,0,.45);
+        }
+
+        .auth-header{
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            margin-bottom:20px;
+            padding-bottom:15px;
+            border-bottom:1px solid var(--border);
+        }
+
+        .auth-btn{
+            padding:10px 16px;
+            border:none;
+            border-radius:8px;
+            font-size:13px;
+            font-weight:700;
+            cursor:pointer;
+        }
+
+        .btn-login{
+            background:var(--primary);
+            color:white;
+        }
+
+        .btn-logout{
+            background:#2b1111;
+            color:#ff8a8a;
+            display:none;
+        }
+
+        .system-status-text{
+            font-size:13px;
+            color:var(--muted);
+            text-align: right;
+        }
+        
+        .rpc-badge {
+            display: inline-block;
+            font-size: 11px;
+            background: #0f172a;
+            border: 1px solid var(--border);
+            padding: 3px 8px;
+            border-radius: 6px;
+            color: #38bdf8;
+            margin-top: 4px;
+            font-family: monospace;
+        }
+
+        .main-app-content{
+            display:none;
+        }
+
+        .tabs{
+            display:flex;
+            gap:10px;
+            margin-bottom:20px;
+        }
+
+        .tab-btn{
+            flex:1;
+            padding:12px;
+            background:#0f172a;
+            border:1px solid var(--border);
+            color:var(--muted);
+            border-radius:8px;
+            cursor:pointer;
+            font-weight:700;
+        }
+
+        .tab-btn.active{
+            background:var(--primary);
+            color:white;
+        }
+
+        .tab-content{
+            display:none;
+        }
+
+        .tab-content.active{
+            display:block;
+        }
+
+        h2{
+            text-align:center;
+            margin-bottom:10px;
+        }
+
+        .info-tag{
+            text-align:center;
+            padding:10px;
+            background:rgba(37,99,235,.1);
+            color:#60a5fa;
+            border-radius:8px;
+            font-size:13px;
+            margin-bottom:20px;
+        }
+
+        .drop-zone{
+            border:2px dashed #4b5563;
+            border-radius:12px;
+            padding:40px 20px;
+            text-align:center;
+            cursor:pointer;
+            background:#111827;
+        }
+
+        .drop-zone:hover{
+            border-color:#60a5fa;
+        }
+
+        .drop-zone p{
+            color:var(--muted);
+        }
+
+        #fileInput{
+            display:none;
+        }
+
+        .input-box{
+            margin-top:15px;
+        }
+
+        label{
+            display:block;
+            margin-bottom:8px;
+            color:var(--muted);
+            font-size:13px;
+        }
+
+        input[type="text"]{
+            width:100%;
+            padding:12px;
+            border-radius:8px;
+            border:1px solid var(--border);
+            background:#0b0f19;
+            color:white;
+        }
+
+        .action-btn{
+            width:100%;
+            padding:14px;
+            margin-top:18px;
+            border:none;
+            border-radius:8px;
+            background:var(--primary);
+            color:white;
+            font-size:15px;
+            font-weight:700;
+            cursor:pointer;
+        }
+
+        .action-btn:disabled{
+            background:#374151;
+            cursor:not-allowed;
+        }
+
+        .progress-wrapper{
+            margin-top:18px;
+            display:none;
+        }
+
+        .progress-meta{
+            display:flex;
+            justify-content:space-between;
+            margin-bottom:8px;
+            font-size:12px;
+            color:var(--muted);
+        }
+
+        .progress-bar-bg{
+            width:100%;
+            height:10px;
+            background:#1e293b;
+            border-radius:999px;
+            overflow:hidden;
+        }
+
+        .progress-bar-fill{
+            width:0%;
+            height:100%;
+            background:linear-gradient(90deg,#10b981,#06b6d4);
+            transition: width 0.3s;
+        }
+
+        .alert-box{
+            margin-top:15px;
+            padding:12px;
+            border-radius:8px;
+            display:none;
+            text-align:center;
+            font-size:13px;
+            font-weight:600;
+        }
+
+        .alert-success{
+            background:rgba(22,163,74,.1);
+            color:#4ade80;
+            border: 1px solid rgba(22,163,74,.2);
+        }
+
+        .alert-error{
+            background:rgba(220,38,38,.1);
+            color:#f87171;
+            border: 1px solid rgba(220,38,38,.2);
+        }
+
+        .inbox-list{
+            margin-top:15px;
+            display:flex;
+            flex-direction:column;
+            gap:10px;
+        }
+
+        .inbox-item{
+            background:#111827;
+            border:1px solid var(--border);
+            border-radius:10px;
+            padding:14px;
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+        }
+
+        .download-btn{
+            background:var(--success);
+            color:white;
+            border:none;
+            padding:10px 14px;
+            border-radius:8px;
+            cursor:pointer;
+            font-weight:700;
+            text-decoration: none;
+            font-size: 13px;
+        }
+
+        .empty{
+            text-align:center;
+            color:var(--muted);
+            padding:25px;
+            font-size: 13px;
+            border: 1px dashed var(--border);
+            border-radius: 8px;
+            background: #0f172a;
+        }
+
+        #lockScreenNotice{
+            text-align:center;
+            padding:50px 20px;
+        }
+        
+        .sync-text-badge {
+            display: inline-block;
+            font-size: 11px;
+            color: #10b981;
+            font-weight: bold;
+            background: rgba(16, 185, 129, 0.1);
+            padding: 3px 8px;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="wrapper">
+    <div class="auth-header">
+        <div>
+            <button id="loginBtn" class="auth-btn btn-login" onclick="connectMetaMask()">🔑 Connect MetaMask</button>
+            <button id="logoutBtn" class="auth-btn btn-logout" onclick="disconnectWallet()">🔒 Disconnect</button>
+        </div>
+        <div>
+            <div id="statusText" class="system-status-text">❌ Wallet Not Connected</div>
+            <div id="rpcStatusDisplay" class="rpc-badge" style="display: none;">RPC: Checking...</div>
+        </div>
+    </div>
+
+    <div id="lockScreenNotice">
+        <h1 style="margin-bottom:10px;">Arc File Sharing</h1>
+        <p style="color:var(--muted);font-size:14px;">Secure decentralized blockchain file sharing</p>
+    </div>
+
+    <div id="mainAppContent" class="main-app-content">
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('sendPanel',this)">📤 Send File</button>
+            <button class="tab-btn" onclick="switchTab('inboxPanel',this)">📥 File Inbox</button>
+        </div>
+
+        <div id="sendPanel" class="tab-content active">
+            <h2>Upload To Blockchain</h2>
+            <div class="info-tag">IPFS + Smart Contract Storage</div>
+
+            <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                <p id="label">Drag & Drop file or click to browse</p>
+                <input type="file" id="fileInput">
+            </div>
+
+            <div class="input-box">
+                <label>Receiver Wallet Address</label>
+                <input type="text" id="targetWallet" placeholder="0x...">
+            </div>
+
+            <div class="progress-wrapper" id="uploadProgressWrapper">
+                <div class="progress-meta">
+                    <span id="progressStatusText">Uploading...</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="uploadProgressBarFill"></div>
+                </div>
+            </div>
+
+            <button id="submitBtn" class="action-btn" disabled>🚀 Upload & Send</button>
+            <div id="senderAlert" class="alert-box"></div>
+        </div>
+
+        <div id="inboxPanel" class="tab-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h2>Your Smart Contract Inbox</h2>
+                <span class="sync-text-badge" id="syncBadge">🔄 Live Syncing</span>
+            </div>
+            <div class="inbox-list" id="inboxDisplayContainer">
+                <div class="empty">Reading logs from block ledger...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const CONTRACT_ADDRESS = "0xd50d5d836ce2AAe91c4DB05188f171bEb7B76458"; 
+    const CONTRACT_ABI = [
+        "function anchorFile(address _receiver, string memory _filename, string memory _filesize, string memory _ipfsHash, string memory _fileExt) public",
+        "function getMyInbox() public view returns (tuple(string filename, string filesize, string ipfsHash, string fileExtension, address sender, uint256 timestamp)[])"
+    ];
+
+    const PINATA_JWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiI3MzlhYWU2ZS1kNmIzLTQ3ZGMtOWQ4My04ODQxOGYzMzUxNWQiLCJlbWFpbCI6ImVhcm5tb25leWdheWFuZXJhbmdhQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJwaW5fcG9saWN5Ijp7InJlZ2lvbnMiOlt7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6IkZSQTEifSx7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6Ik5ZQzEifV0sInZlcnNpb24iOjF9LCJtZmFfZW5hYmxlZCI6ZmFsc2UsInN0YXR1cyI6IkFDVElWRSJ9LCJhdXRoZW50aWNhdGlvblR5cGUiOiJzY29wZWRLZXkiLCJzY29wZWRLZXlLZXkiOiJlZGM0OTg3N2I2ODg1NTZjMDA5YiIsInNjb3BlZEtleVNlY3JldCI6Ijk1YzBkZjI0Yjk1YjA4YzEzNTBhMjAyMzFkOWI5ZDdkYzM0MWVkNWU3Mzc5NTRhZjUzOTA1NDMxMmM2ZTQ4YWQiLCJleHAiOjE4MTIxMTQzOTF9.jcb0FrIy-6G6JgpQINbkuI_OpQkBjEARlXfPh2c8nwA";
+
+    const ARC_CHAIN_ID_HEX = "0x4cef52"; 
+    const ARC_CHAIN_ID_DECIMAL = 5041938; // 🔴 FIXED: කලින් තිබුණු වැරදි ID එක වෙනුවට සැබෑ Arc Testnet Decimal ID එක
+    const ARC_RPC_ENDPOINTS = [
+        "https://rpc.testnet.arc.network",
+        "https://arc-testnet.drpc.org"
+    ];
+
+    let web3Provider, signer, liveContractInstance;
+    let userWalletAddress = null;
+    let verifiedFile = null;
+    let optimizedActiveRpc = ARC_RPC_ENDPOINTS[0];
+    let syncIntervalLoop = null;
+    let isListeningToNetwork = false;
+
+    async function resolveFastestRpcProvider() {
+        for (let endpoint of ARC_RPC_ENDPOINTS) {
+            try {
+                let testProvider = new ethers.JsonRpcProvider(endpoint);
+                await testProvider.getBlockNumber(); 
+                optimizedActiveRpc = endpoint;
+                document.getElementById('rpcStatusDisplay').style.display = 'inline-block';
+                document.getElementById('rpcStatusDisplay').innerText = `📡 RPC: ${optimizedActiveRpc.replace('https://', '')}`;
+                return testProvider;
+            } catch (e) {
+                console.warn("Slow RPC node:", endpoint);
+            }
+        }
+        return new ethers.JsonRpcProvider(ARC_RPC_ENDPOINTS[0]);
+    }
+
+    async function enforceArcNetworkConfiguration() {
+        if (!window.ethereum) return false;
+        try {
+            const activeChainId = await window.ethereum.request({ method: 'eth_chainId' });
+            if (parseInt(activeChainId, 16) !== ARC_CHAIN_ID_DECIMAL) {
+                try {
+                    await window.ethereum.request({
+                        method: 'wallet_switchEthereumChain',
+                        params: [{ chainId: ARC_CHAIN_ID_HEX }],
+                    });
+                } catch (switchError) {
+                    if (switchError.code === 4902 || switchError.data?.originalError?.code === 4902) {
+                        await window.ethereum.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [{
+                                chainId: ARC_CHAIN_ID_HEX,
+                                chainName: "Arc Testnet",
+                                nativeCurrency: { name: "ARC", symbol: "ARC", decimals: 18 },
+                                rpcUrls: ARC_RPC_ENDPOINTS,
+                                blockExplorerUrls: []
+                            }],
+                        });
+                    } else {
+                        throw switchError;
+                    }
+                }
+            }
+            return true;
+        } catch (err) {
+            console.error("Network enforcement failed:", err);
+            return false;
+        }
+    }
+
+    function setupNetworkListeners() {
+        if (window.ethereum && !isListeningToNetwork) {
+            window.ethereum.on('chainChanged', async (chainId) => {
+                if (userWalletAddress && parseInt(chainId, 16) !== ARC_CHAIN_ID_DECIMAL) {
+                    alert("⚠️ Network Mismatch! Switching back to Arc Testnet.");
+                    const success = await enforceArcNetworkConfiguration();
+                    if (success) window.location.reload();
+                }
+            });
+
+            window.ethereum.on('accountsChanged', async (accounts) => {
+                if (accounts.length === 0) {
+                    disconnectWallet();
+                } else if (accounts[0].toLowerCase() !== userWalletAddress.toLowerCase()) {
+                    userWalletAddress = accounts[0];
+                    document.getElementById('statusText').innerText = `🟢 ${userWalletAddress.substring(0,6)}...${userWalletAddress.substring(userWalletAddress.length-4)}`;
+                    
+                    // Re-init instances with the new account
+                    web3Provider = new ethers.BrowserProvider(window.ethereum);
+                    signer = await web3Provider.getSigner();
+                    liveContractInstance = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+                    
+                    if(document.getElementById('inboxPanel').classList.contains('active')) fetchInboxFromBlockchain();
+                }
+            });
+            isListeningToNetwork = true;
+        }
+    }
+
+    async function connectMetaMask() {
+        if (typeof window.ethereum === 'undefined') {
+            alert("MetaMask is not installed! Please install it to continue."); 
+            return;
+        }
+        try {
+            document.getElementById('statusText').innerText = "Connecting...";
+            
+            // 🔴 FIXED: Request accounts මුලින්ම ලබාගෙන ඉන්පසු Network එක මාරු කිරීම සිදු කරයි
+            await window.ethereum.request({ method: 'eth_requestAccounts' });
+            
+            const networkVerified = await enforceArcNetworkConfiguration();
+            if (!networkVerified) {
+                document.getElementById('statusText').innerText = "❌ Network Mismatch"; 
+                return;
+            }
+
+            web3Provider = new ethers.BrowserProvider(window.ethereum);
+            signer = await web3Provider.getSigner();
+            userWalletAddress = await signer.getAddress();
+            
+            await resolveFastestRpcProvider();
+            liveContractInstance = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+            setupNetworkListeners();
+
+            document.getElementById('statusText').innerText = `🟢 ${userWalletAddress.substring(0,6)}...${userWalletAddress.substring(userWalletAddress.length-4)}`;
+            document.getElementById('loginBtn').style.display = 'none';
+            document.getElementById('logoutBtn').style.display = 'inline-block';
+            document.getElementById('lockScreenNotice').style.display = 'none';
+            document.getElementById('mainAppContent').style.display = 'block';
+        } catch (error) {
+            console.error("MetaMask Connection Error:", error);
+            document.getElementById('statusText').innerText = "❌ Connection Failed";
+        }
+    }
+
+    function disconnectWallet() {
+        clearInterval(syncIntervalLoop);
+        userWalletAddress = null;
+        document.getElementById('loginBtn').style.display = 'inline-block';
+        document.getElementById('logoutBtn').style.display = 'none';
+        document.getElementById('lockScreenNotice').style.display = 'block';
+        document.getElementById('mainAppContent').style.display = 'none';
+        document.getElementById('statusText').innerText = "❌ Wallet Disconnected";
+        document.getElementById('rpcStatusDisplay').style.display = 'none';
+    }
+
+    function switchTab(panelId, btn) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(panelId).classList.add('active');
+        btn.classList.add('active');
+
+        if(panelId === 'inboxPanel') {
+            fetchInboxFromBlockchain();
+            clearInterval(syncIntervalLoop);
+            syncIntervalLoop = setInterval(fetchInboxFromBlockchain, 5000); 
+        } else {
+            clearInterval(syncIntervalLoop);
+        }
+    }
+
+    // Drag and Drop
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const submitBtn = document.getElementById('submitBtn');
+
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = '#60a5fa'; });
+    dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = '#4b5563'; });
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = '#4b5563';
+        if(e.dataTransfer.files.length > 0) handleFileSelection(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', (e) => {
+        if(e.target.files.length > 0) handleFileSelection(e.target.files[0]);
+    });
+
+    function handleFileSelection(file) {
+        verifiedFile = file;
+        submitBtn.disabled = false;
+        document.getElementById('label').innerText = `Selected: ${verifiedFile.name} (${(verifiedFile.size/1024).toFixed(1)} KB)`;
+    }
+
+    submitBtn.addEventListener('click', async () => {
+        const receiver = document.getElementById('targetWallet').value.trim();
+        if(!ethers.isAddress(receiver)) {
+            alert("Please enter a valid EVM Wallet Address!"); return;
+        }
+
+        try {
+            submitBtn.disabled = true;
+            document.getElementById('senderAlert').style.display = 'none';
+            document.getElementById('uploadProgressWrapper').style.display = 'block';
+            
+            updateProgress(25, "Uploading real file payload bytes to IPFS network...");
+
+            const formData = new FormData();
+            formData.append('file', verifiedFile);
+
+            const uploadResponse = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${PINATA_JWT}` },
+                body: formData
+            });
+
+            if (!uploadResponse.ok) throw new Error("IPFS Gateway rejected. Check your token permissions.");
+
+            const uploadResult = await uploadResponse.json();
+            const realCID = uploadResult.IpfsHash; 
+
+            updateProgress(65, "IPFS CID generated! Requesting signature...");
+            await enforceArcNetworkConfiguration();
+
+            const tx = await liveContractInstance.anchorFile(
+                receiver,
+                verifiedFile.name,
+                (verifiedFile.size / 1024).toFixed(1) + " KB",
+                realCID, 
+                verifiedFile.name.split('.').pop().toLowerCase()
+            );
+
+            updateProgress(85, "Mining transaction block confirmation on Arc Chain...");
+            await tx.wait(); 
+
+            updateProgress(100, "Successfully Anchored!");
+            showAlert(`Success! File dispatched completely. Hash: ${realCID}`, "success");
+            
+            submitBtn.disabled = false;
+            verifiedFile = null;
+            document.getElementById('label').innerText = "Drag & Drop file or click to browse";
+        } catch (err) {
+            console.error(err);
+            showAlert(err.message || "Execution flow failed.", "error");
+            submitBtn.disabled = false;
+        }
+    });
+
+    async function fetchInboxFromBlockchain() {
+        const container = document.getElementById('inboxDisplayContainer');
+        const badge = document.getElementById('syncBadge');
+        
+        try {
+            badge.innerText = "🔄 Syncing...";
+            badge.style.color = "#38bdf8";
+
+            if (!userWalletAddress) return;
+
+            const fallbackRpcProvider = await resolveFastestRpcProvider();
+            const readOnlyContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, fallbackRpcProvider);
+
+            const rawInboxList = await readOnlyContract.getMyInbox({ from: userWalletAddress });
+
+            if(rawInboxList.length === 0) {
+                container.innerHTML = "<div class='empty'>No secured files found on-chain for this address.</div>";
+                badge.innerText = "🟢 Synced"; badge.style.color = "#10b981"; return;
+            }
+
+            const cleanList = [...rawInboxList].reverse();
+            container.innerHTML = ""; 
+
+            cleanList.forEach(file => {
+                const itemRow = document.createElement('div');
+                itemRow.className = 'inbox-item';
+                const secureGatewayUrl = `https://gateway.pinata.cloud/ipfs/${file.ipfsHash}`;
+
+                const textContainer = document.createElement('div');
+                
+                const titleMeta = document.createElement('div');
+                titleMeta.style.fontWeight = "600";
+                titleMeta.style.color = "white";
+                titleMeta.textContent = `${file.filename} (${file.filesize})`;
+
+                const senderMeta = document.createElement('div');
+                senderMeta.style.fontSize = "11px";
+                senderMeta.style.color = "var(--muted)";
+                senderMeta.style.marginTop = "3px";
+                senderMeta.textContent = `Sender: ${file.sender.substring(0,8)}...${file.sender.substring(file.sender.length-6)}`;
+
+                textContainer.appendChild(titleMeta);
+                textContainer.appendChild(senderMeta);
+
+                const downloadLink = document.createElement('a');
+                downloadLink.className = 'download-btn';
+                downloadLink.href = secureGatewayUrl;
+                downloadLink.target = '_blank';
+                downloadLink.textContent = "📥 Download";
+
+                itemRow.appendChild(textContainer);
+                itemRow.appendChild(downloadLink);
+                container.appendChild(itemRow);
+            });
+
+            badge.innerText = "🟢 Synced";
+            badge.style.color = "#10b981";
+        } catch (err) {
+            console.error("Inbox Sync Error:", err);
+            badge.innerText = "❌ Sync Error";
+            badge.style.color = "#dc2626";
+        }
+    }
+
+    function updateProgress(per, text) {
+        document.getElementById('uploadProgressBarFill').style.width = per + "%";
+        document.getElementById('progressPercent').innerText = per + "%";
+        document.getElementById('progressStatusText').innerText = text;
+    }
+    function showAlert(msg, type) {
+        const alertBox = document.getElementById('senderAlert');
+        alertBox.innerText = msg; alertBox.className = `alert-box alert-${type}`; alertBox.style.display = 'block';
+    }
+</script>
+</body>
+</html>
